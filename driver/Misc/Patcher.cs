@@ -26,7 +26,7 @@ namespace Misc {
 
          if (ClangApplyReplacements(PatchFolder)) {
             CleanupFolder(patches);
-            AfterAppliedPatches(editedFiles);
+            AfterApplyPatch(editedFiles);
          }
       }
 
