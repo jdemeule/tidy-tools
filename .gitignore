@@ -30,3 +30,15 @@
 *.exe
 *.out
 *.app
+
+# Project temporaries
+*.suo
+*.user
+*.userprefs
+
+# Temporary folders
+.DS_Store
+build-dir/
+bin/
+obj/
+packages/
