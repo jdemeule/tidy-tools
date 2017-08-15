@@ -81,3 +81,8 @@ Optionnal arguments:
                                transform.
       --sample               Sample transform
 ```
+
+
+## Note
+
+This project is licensed under the terms of the MIT license.
