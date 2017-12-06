@@ -53,41 +53,6 @@ LLVM_INSTANTIATE_REGISTRY(tidy::TransformFactoryRegistry);
 
 namespace tidy {
 
-
-cl::OptionCategory SmallTidyCategory("small tidy code options");
-
-
-static cl::opt<bool> Quiet(
-   "quiet", cl::desc("Do not report colored AST in case of error"),
-   cl::cat(SmallTidyCategory));
-
-static cl::opt<bool> StdOut("stdout",
-                            cl::desc("Print output to cout instead of file"),
-                            cl::cat(SmallTidyCategory));
-static cl::opt<bool> Export("export", cl::desc("Export fixes to patches"),
-                            cl::cat(SmallTidyCategory));
-
-static cl::opt<bool> AllTransformation("all",
-                                       cl::desc("Apply all transformations"),
-                                       cl::cat(SmallTidyCategory));
-
-static cl::opt<std::string> OutputDir("outputdir",
-                                      cl::desc("<path> output dir."),
-                                      cl::cat(SmallTidyCategory));
-
-std::string GetOutputDir() {
-   if (OutputDir.empty())
-      return "";
-
-   std::string path = OutputDir;
-   if (std::error_code EC = sys::fs::create_directory(path)) {
-      std::cerr << "Error when create output directory (" << EC.value() << ")";
-   }
-   return path;
-}
-
-
-
 template <typename It>
 TranslationUnitReplacements BuildTURs(const std::string& mainfilepath,
                                       const std::string& context,
@@ -162,7 +127,7 @@ Transforms::Transforms()
    , m_options()
    , m_context() {}
 
-void Transforms::registerOptions() {
+void Transforms::registerOptions(const llvm::cl::cat& Category) {
    for (TransformFactoryRegistry::iterator
            I = TransformFactoryRegistry::begin(),
            E = TransformFactoryRegistry::end();
@@ -170,12 +135,13 @@ void Transforms::registerOptions() {
         ++I) {
 
       m_options[I->getName()] = llvm::make_unique<cl::opt<bool>>(
-         I->getName(), cl::desc(I->getDesc()), cl::cat(SmallTidyCategory));
+         I->getName(), cl::desc(I->getDesc()), cl::cat(Category));
    }
 }
 
 void Transforms::apply(const CompilationDatabase&      Compilations,
-                       const std::vector<std::string>& SourcePaths) {
+                       const std::vector<std::string>& SourcePaths, bool Quiet,
+                       bool StdOut, bool Export, std::string OutputDir) {
    // made transform context local.
    // link the refactoring tool or at least the map of file/replacement to the
    // transform context
@@ -199,7 +165,7 @@ void Transforms::apply(const CompilationDatabase&      Compilations,
       m_context.PrintReplacements(std::cout, Tool);
 
    if (Export)
-      m_context.ExportReplacements(GetOutputDir());
+      m_context.ExportReplacements(OutputDir);
 }
 
 
@@ -210,7 +176,7 @@ void Transforms::instanciateTransforms() {
         I != E;
         ++I) {
 
-      if (*m_options[I->getName()] || AllTransformation) {
+      if (*m_options[I->getName()]) {
          auto factory = I->instantiate();
          auto check   = factory->create(I->getName(), &m_context);
          if (check)

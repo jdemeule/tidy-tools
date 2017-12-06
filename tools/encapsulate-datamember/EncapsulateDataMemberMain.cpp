@@ -10,8 +10,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,40 +22,59 @@
 // SOFTWARE.
 //
 
+#include "EncapsulateDataMember.hpp"
+
+#include <Transform.hpp>
+
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/CompilationDatabase.h"
 #include "clang/Tooling/Refactoring.h"
 
-#include "Transform.hpp"
-
 using namespace clang;
 using namespace clang::tooling;
 using namespace llvm;
+
 using namespace tidy;
 
 namespace {
 
-static cl::OptionCategory SmallTidyCategory("small tidy code options");
+static cl::OptionCategory Category("encapsulate datamember options");
+
+static cl::list<std::string> Names(
+   "names", cl::CommaSeparated,
+   cl::desc("The list of fully qualified datamember to encapsulate, "
+            "e.g. \"Foo::xxx,a::Bar::yyy\"."),
+   cl::cat(Category));
+
+static cl::opt<CaseLevel> Case(
+   cl::desc("Choose getter/setter case:"),
+   cl::values(clEnumValN(CaseLevel::camel, "camelCase",
+                         "pascal case getX/setX (default)."),
+              clEnumValN(CaseLevel::snake, "snake_case",
+                         "bjarne case get_x/set_x.")
+#if defined(CLANG_38)
+                 ,
+              clEnumValEnd
+#endif
+              ),
+   cl::init(CaseLevel::camel),
+   cl::cat(Category));
 
 
 static cl::opt<bool> Quiet("quiet", cl::desc("Discard clang warnings."),
-                           cl::cat(SmallTidyCategory));
+                           cl::cat(Category));
 
 static cl::opt<bool> StdOut("stdout",
                             cl::desc("Print output to cout instead of file"),
-                            cl::cat(SmallTidyCategory));
+                            cl::cat(Category));
 static cl::opt<bool> Export("export", cl::desc("Export fixes to patches"),
-                            cl::cat(SmallTidyCategory));
-
-static cl::opt<bool> AllTransformation("all",
-                                       cl::desc("Apply all transformations"),
-                                       cl::cat(SmallTidyCategory));
+                            cl::cat(Category));
 
 static cl::opt<std::string> OutputDir("outputdir",
                                       cl::desc("<path> output dir."),
-                                      cl::cat(SmallTidyCategory));
+                                      cl::cat(Category));
 
-std::string GetOutputDir() {
+static std::string GetOutputDir() {
    if (OutputDir.empty())
       return "";
 
@@ -70,13 +89,31 @@ std::string GetOutputDir() {
 
 
 int main(int argc, const char** argv) {
-   Transforms transforms;
-   transforms.registerOptions(SmallTidyCategory);
+   CommonOptionsParser op(argc, argv, Category);
+   RefactoringTool     Tool(op.getCompilations(), op.getSourcePathList());
 
-   CommonOptionsParser op(argc, argv, SmallTidyCategory);
 
-   transforms.apply(op.getCompilations(), op.getSourcePathList(), Quiet, StdOut,
-                    Export, GetOutputDir());
+   auto diagConsumer = llvm::make_unique<IgnoringDiagConsumer>();
+   if (Quiet)
+      Tool.setDiagnosticConsumer(diagConsumer.get());
 
-   return 0;
+   EncapsulateDataMemberOptions opts;
+   opts.Names = {Names.begin(), Names.end()};
+   opts.Case  = Case;
+
+   TransformContext      ctx;
+   EncapsulateDataMember action(&ctx, &opts);
+
+   Transform::MatchFinder Finder;
+
+   action.registerMatchers(&Finder);
+
+   int res = Tool.run(newFrontendActionFactory(&Finder).get());
+
+   if (StdOut)
+      ctx.PrintReplacements(std::cout, Tool);
+   if (Export)
+      ctx.ExportReplacements(GetOutputDir());
+
+   return res;
 }

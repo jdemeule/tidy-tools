@@ -156,6 +156,6 @@ Optionnal arguments:";;
          optionSet.WriteOptionDescriptions(Console.Out);
       }
 
-      const string VERSION = "1d";
+      const string VERSION = "1e";
    }
 }

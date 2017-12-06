@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(tidy-tools)
 
-set(CMAKE_DEBUG_TARGET_PROPERTIES INCLUDE_DIRECTORIES COMPILE_DEFINITIONS)
+#set(CMAKE_DEBUG_TARGET_PROPERTIES INCLUDE_DIRECTORIES COMPILE_DEFINITIONS)
 
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -25,7 +25,10 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES ".*Clang")
    add_cxx_compiler_flag(-fvisibility=hidden)
    add_cxx_compiler_flag(-O3 RELEASE)
    add_cxx_compiler_flag(-stdlib=libc++)
+elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "MSVC")
+   add_cxx_compiler_flag(-MP)
 endif()
+
 
 find_package(LLVM REQUIRED CONFIG)
 find_package(Clang)
@@ -34,6 +37,7 @@ macro(add_tidy_executable name)
    add_executable(${name} ${ARGN})
    target_include_directories(${name} PRIVATE ${LLVM_INCLUDE_DIRS})
    set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+   install(TARGETS ${name} RUNTIME DESTINATION bin)
 endmacro()
 
 macro(add_tidy_library name)

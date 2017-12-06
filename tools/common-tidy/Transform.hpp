@@ -87,25 +87,25 @@ inline FixItHIntHelper& operator<<(FixItHIntHelper&        h,
 
 class Transform : public clang::ast_matchers::MatchFinder::MatchCallback {
 public:
+   using MatchFinder = clang::ast_matchers::MatchFinder;
+
    Transform(llvm::StringRef CheckName, TransformContext* ctx)
       : CheckName(CheckName)
       , m_ctx(ctx) {}
 
    virtual ~Transform() {}
 
-   virtual void registerMatchers(clang::ast_matchers::MatchFinder* Finder) {}
+   virtual void registerMatchers(MatchFinder* Finder) {}
 
-   virtual void check(
-      const clang::ast_matchers::MatchFinder::MatchResult& Result) {}
+   virtual void check(const MatchFinder::MatchResult& Result) {}
 
    FixItHIntHelper diag(
-      const clang::ast_matchers::MatchFinder::MatchResult& Result,
-      clang::SourceLocation Loc, llvm::StringRef Description,
+      const MatchFinder::MatchResult& Result, clang::SourceLocation Loc,
+      llvm::StringRef             Description,
       clang::DiagnosticIDs::Level Level = clang::DiagnosticIDs::Remark);
 
 private:
-   void run(
-      const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+   void run(const MatchFinder::MatchResult& Result) override;
 
 protected:
    std::string       CheckName;
@@ -126,10 +126,14 @@ class Transforms {
 public:
    Transforms();
 
-   void registerOptions();
+   void registerOptions(const llvm::cl::cat& Category);
 
    void apply(const clang::tooling::CompilationDatabase& Compilations,
-              const std::vector<std::string>&            SourcePaths);
+              const std::vector<std::string>&            SourcePaths,
+              bool                                       Quiet     = false,
+              bool                                       StdOut    = false,
+              bool                                       Export    = false,
+              std::string                                OutputDir = "");
 
 private:
    void instanciateTransforms();
@@ -145,8 +149,6 @@ private:
 };
 
 
-extern llvm::cl::OptionCategory   SmallTidyCategory;
-extern std::string                GetOutputDir();
 }  // namespace tidy
 
 #endif

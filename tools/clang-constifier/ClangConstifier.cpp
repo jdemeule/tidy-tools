@@ -10,8 +10,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -1153,8 +1153,8 @@ public:
 
 private:
    std::map<const void*, std::unique_ptr<UseDefNode>> m_declnodes;
-   std::vector<std::unique_ptr<UseDefNode>> m_othernodes;
-   DummyModifierNode                        m_dummyModifier;
+   std::vector<std::unique_ptr<UseDefNode>>           m_othernodes;
+   DummyModifierNode                                  m_dummyModifier;
 };
 
 
@@ -1184,7 +1184,7 @@ std::string replace_all(const std::string& str, const std::string& what,
 
    return sstr.str();
 }
-}
+}  // namespace
 
 static llvm::cl::OptionCategory ConstifyCategory("Constify 'char*'");
 
@@ -1987,7 +1987,6 @@ private:
 // For each source file provided to the tool, a new FrontendAction is created.
 class ConstifyFrontendAction : public ASTFrontendAction {
 public:
-
    ConstifyFrontendAction()
       : m_rewriter()
       , m_graph()
@@ -2248,7 +2247,7 @@ public:
       std::for_each(
          m_entries.begin(), m_entries.end(), [&](const FileEntry* e) {
             if (!Inplace)
-               std::cerr << "   " << e->getName().str() << "\n";
+               std::cerr << "   " << std::string(e->getName()) << "\n";
 
 
             std::unique_ptr<llvm::raw_ostream> FileStream(
@@ -2258,7 +2257,7 @@ public:
                FileStream.reset(new llvm::raw_fd_ostream(
                   e->getName(), EC, llvm::sys::fs::F_Text));
                if (EC) {
-                  std::cerr << "Could not open " << e->getName().str()
+                  std::cerr << "Could not open " << std::string(e->getName())
                             << " for writing\n";
                   return;
                }
