@@ -1,14 +1,9 @@
-
 add_tidy_executable(small-tidy
    EarlyReturn.cpp
    InitAtDeclare.cpp
    NonAsciiLiteral.cpp
    Sample.cpp
-   Transform.cpp
-   Transform.hpp
-   main.cpp
-   misc.hpp
-   )
+   SmallTidyMain.cpp)
 
 target_link_libraries(small-tidy
    PRIVATE
@@ -17,4 +12,4 @@ target_link_libraries(small-tidy
    clangBasic
    clangFrontend
    clangTooling
-   )
+   common-tidy)

@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.1)
 project(tidy-tools)
 
+set(CMAKE_DEBUG_TARGET_PROPERTIES INCLUDE_DIRECTORIES COMPILE_DEFINITIONS)
+
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(AddCXXCompilerFlag)
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES ".*Clang")
    add_cxx_compiler_flag(-std=c++1z)
    add_cxx_compiler_flag(-Wall)
    # add_cxx_compiler_flag(-Wextra)
@@ -32,6 +35,12 @@ macro(add_tidy_executable name)
    target_include_directories(${name} PRIVATE ${LLVM_INCLUDE_DIRS})
    set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endmacro()
+
+macro(add_tidy_library name)
+   add_library(${name} ${ARGN})
+   target_include_directories(${name} PRIVATE ${LLVM_INCLUDE_DIRS})
+endmacro()
+
 
 
 add_subdirectory(tools)
