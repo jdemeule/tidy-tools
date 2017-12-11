@@ -25,7 +25,7 @@
 #ifndef TRANSFORM_HPP
 #define TRANSFORM_HPP
 
-#include <iostream>
+#include <iosfwd>
 #include <map>
 #include <memory>
 #include <string>
@@ -35,22 +35,13 @@
 #include "clang/Tooling/Refactoring.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Registry.h"
-#include "llvm/Support/YAMLTraits.h"
+//#include "llvm/Support/YAMLTraits.h"
 
 namespace tidy {
 
 class TransformContext {
 public:
-   void push_back(const clang::tooling::Replacement& replacement) {
-#if CLANG_38
-      m_replacements.insert(replacement);
-#else
-      auto error_code = m_replacements.add(replacement);
-      if (error_code) {
-         std::cerr << "Cannot apply " << replacement.toString() << '\n';
-      }
-#endif
-   }
+   void push_back(const clang::tooling::Replacement& replacement);
 
    void ExportReplacements(const std::string& outputDir) const;
 
