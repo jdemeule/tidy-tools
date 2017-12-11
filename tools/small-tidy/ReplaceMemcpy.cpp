@@ -44,6 +44,17 @@ using namespace clang::tooling;
 
 namespace tidy {
 
+
+// callExpr matcher remove implicitCast for us on argument.
+AST_MATCHER(Expr, pointerToPOD) {
+   auto type = Node.getType();
+   if (const PointerType* PT = dyn_cast<PointerType>(type)) {
+      auto pointee = PT->getPointeeType();
+      return pointee.isPODType(Finder->getASTContext());
+   }
+   return false;
+}
+
 template <typename T>
 static llvm::StringRef CodeFragment(const T& Node, const SourceManager& SM,
                                     const LangOptions& LangOpts) {
@@ -60,6 +71,7 @@ public:
 
    virtual void registerMatchers(MatchFinder* Finder) {
       Finder->addMatcher(callExpr(callee(functionDecl(hasName("memcpy"))),
+                                  hasArgument(0, pointerToPOD()),
                                   hasArgument(2, unaryExprOrTypeTraitExpr()),
                                   isExpansionInMainFile())
                             .bind("memcpy"),
@@ -68,6 +80,7 @@ public:
 
    virtual void check(const MatchFinder::MatchResult& Result) {
       auto callMemcpy = Result.Nodes.getNodeAs<CallExpr>("memcpy");
+
       auto Diag =
          diag(Result,
               callMemcpy->getExprLoc(),
