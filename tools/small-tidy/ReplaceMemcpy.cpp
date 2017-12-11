@@ -134,5 +134,5 @@ struct ReplaceMemcpyTransformFactory : public TransformFactory {
 };
 
 static TransformFactoryRegistry::Add<ReplaceMemcpyTransformFactory> X_Memcpy(
-   "replace-memcpy", "");
+   "replace-memcpy", "Replace memcpy to assignment operator on POD");
 }

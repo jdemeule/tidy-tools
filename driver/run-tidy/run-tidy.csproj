@@ -75,6 +75,7 @@
     <Compile Include="ClangTidy.cs" />
     <Compile Include="EncapsulateDataMember.cs" />
     <Compile Include="EarlyReturn.cs" />
+    <Compile Include="ReplaceMemcpy.cs" />
     <Compile Include="RunTidy.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
