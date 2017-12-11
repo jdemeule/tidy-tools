@@ -47,12 +47,62 @@ using namespace clang::tooling;
 
 namespace tidy {
 
+bool isArgumentCapturedByNonConstReference(const CallExpr* call, const Expr* arg) {
+   auto fct = dyn_cast<FunctionDecl>(call->getCalleeDecl());
+   if (!fct)
+      return false;
+
+   for (int n = 0; n < call->getNumArgs(); ++n) {
+      auto argN = call->getArg(n);
+      if (argN == arg) {
+         auto param = fct->getParamDecl(n);
+         auto type = param->getType();
+         return !type.isConstQualified() && param->getType()->isReferenceType();
+      }
+   }
+   return false;
+}
+
 EncapsulateDataMember::EncapsulateDataMember(
    TransformContext* ctx, const EncapsulateDataMemberOptions* Options)
    : Transform("encapsulate-datamember", ctx)
    , Options(Options) {}
 
 
+StatementMatcher memberWithReferenceUsage(const std::string& Name) {
+   return memberExpr(
+             member(hasName(Name)),
+             unless(anyOf(
+                hasParent(callExpr()),
+                hasParent(
+                   binaryOperator(hasOperatorName("="),
+                                  hasLHS(memberExpr(member(hasName(Name)))))),
+                hasParent(unaryOperator(
+                   hasUnaryOperand(memberExpr(member(hasName(Name)))),
+                   anyOf(hasOperatorName("++"), hasOperatorName("--")))))))
+      .bind("getter");
+}
+
+StatementMatcher memberInCall(const std::string& Name) {
+   return memberExpr(member(hasName(Name)), hasParent(callExpr().bind("call")))
+      .bind("in-call");
+}
+
+StatementMatcher memberWithoutReferenceUsage(const std::string& Name) {
+   return memberExpr(
+             member(hasName(Name)),
+             unless(
+                anyOf(hasParent(callExpr()),
+                      hasParent(binaryOperator(
+                         hasOperatorName("="),
+                         hasLHS(memberExpr(member(hasName(Name)))))),
+                      hasParent(unaryOperator(
+                         hasUnaryOperand(memberExpr(member(hasName(Name)))),
+                         anyOf(hasOperatorName("++"), hasOperatorName("--")))),
+                      hasParent(memberExpr()),
+                      hasParent(unaryOperator(hasOperatorName("&"))))))
+      .bind("getter");
+}
 
 void EncapsulateDataMember::registerMatchers(MatchFinder* Finder) {
    for (const auto& Name : Options->Names) {
@@ -80,27 +130,24 @@ void EncapsulateDataMember::registerMatchers(MatchFinder* Finder) {
             .bind("unaryop"),
          this);
 
+      // match memberExpr used in call expression.
+      // This matcher permit to discover non-const reference usage on it.
+      // call(f.x) => call(f.getX())
+      Finder->addMatcher(memberInCall(Name), this);
 
-      // with contination
-      // hasParent(memberExpr().bind("continuationExpr"))
-      //
-      // take ref of memberExpr
-      // hasParent(unaryOperator(hasOperatorName("&")))
-
-      Finder->addMatcher(
-         memberExpr(
-            member(hasName(Name)),
-            unless(
-               anyOf(hasParent(binaryOperator(
-                        hasOperatorName("="),
-                        hasLHS(memberExpr(member(hasName(Name)))))),
-                     hasParent(unaryOperator(
-                        hasUnaryOperand(memberExpr(member(hasName(Name)))),
-                        anyOf(hasOperatorName("++"), hasOperatorName("--")))))))
-            .bind("getter"),
-         this);  // f.x => f.getX();
+      // Other memberExpr matcher without the 3 previous.
+      // Split in 2 case, where we need non-const reference access and the rest.
+      // f.x => f.getX();
+      if (Options->WithReferenceGetter) {
+         Finder->addMatcher(memberWithReferenceUsage(Name), this);
+      }
+      else {
+         Finder->addMatcher(memberWithoutReferenceUsage(Name), this);
+      }
    }
 }
+
+
 
 void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
    if (auto declaration = Result.Nodes.getNodeAs<FieldDecl>("decl")) {
@@ -128,8 +175,9 @@ void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
             declaration->getLocStart(),
             declaration->getLocEnd().getLocWithOffset(1)),
          fragment.str());
+      return;
    }
-   else if (auto lhs = Result.Nodes.getNodeAs<MemberExpr>("lhs")) {
+   if (auto lhs = Result.Nodes.getNodeAs<MemberExpr>("lhs")) {
       auto binop = Result.Nodes.getNodeAs<BinaryOperator>("binop");
       auto set   = setterName(lhs->getMemberDecl());
 
@@ -146,8 +194,9 @@ void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
       Diag << FixItHint::CreateReplacement(
          CharSourceRange::getTokenRange(lhs->getExprLoc(), binop->getLocEnd()),
          fragment.str());
+      return;
    }
-   else if (auto unary = Result.Nodes.getNodeAs<MemberExpr>("unary")) {
+   if (auto unary = Result.Nodes.getNodeAs<MemberExpr>("unary")) {
       auto accessExpr = Result.Nodes.getNodeAs<Expr>("varaccess");
 
       auto get = getterName(unary->getMemberDecl());
@@ -174,14 +223,31 @@ void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
       auto Diag = diag(Result, unary->getExprLoc(), "Encapsulating foo::x");
       Diag << FixItHint::CreateReplacement(unaryop->getSourceRange(),
                                            fragment.str());
+      return;
    }
-   else if (auto getter = Result.Nodes.getNodeAs<MemberExpr>("getter")) {
-      auto              get = getterName(getter->getMemberDecl());
+   if (auto getter = Result.Nodes.getNodeAs<MemberExpr>("getter")) {
+      auto get = getterName(getter->getMemberDecl());
+
       std::stringstream fragment;
       fragment << get << "()";
       auto Diag = diag(Result, getter->getExprLoc(), "Encapsulating foo::x");
       Diag << FixItHint::CreateReplacement(getter->getExprLoc(),
                                            fragment.str());
+      return;
+   }
+   if (auto inCall = Result.Nodes.getNodeAs<MemberExpr>("in-call")) {
+      auto call = Result.Nodes.getNodeAs<CallExpr>("call");
+      if (!Options->WithReferenceGetter && isArgumentCapturedByNonConstReference(call, inCall))
+         return;
+
+      auto get = getterName(inCall->getMemberDecl());
+
+      std::stringstream fragment;
+      fragment << get << "()";
+      auto Diag = diag(Result, inCall->getExprLoc(), "Encapsulating foo::x");
+      Diag << FixItHint::CreateReplacement(inCall->getExprLoc(),
+                                           fragment.str());
+      return;
    }
 }
 
