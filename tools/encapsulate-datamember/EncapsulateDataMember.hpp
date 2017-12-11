@@ -38,7 +38,9 @@ enum class CaseLevel { camel, snake };
 
 struct EncapsulateDataMemberOptions {
    llvm::SmallVector<std::string, 4> Names;
-   CaseLevel                         Case;
+   CaseLevel Case;
+   bool      GenerateGetterSetter;
+   bool      WithReferenceGetter;
 };
 
 class EncapsulateDataMember : public Transform {

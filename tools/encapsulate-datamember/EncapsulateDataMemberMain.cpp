@@ -30,6 +30,8 @@
 #include "clang/Tooling/CompilationDatabase.h"
 #include "clang/Tooling/Refactoring.h"
 
+#include <iostream>
+
 using namespace clang;
 using namespace clang::tooling;
 using namespace llvm;
@@ -58,6 +60,19 @@ static cl::opt<CaseLevel> Case(
 #endif
               ),
    cl::init(CaseLevel::camel),
+   cl::cat(Category));
+
+static cl::opt<bool> DontGenerateGetterSetter(
+   "no-accessors-gen",
+   cl::desc("Do not generated accessors (getter and setter) on given symbol. "
+            "Expect they exist with the correct namming scheme (camel or snake "
+            "case)."),
+   cl::cat(Category));
+
+
+static cl::opt<bool> WithReferenceGetter(
+   "with-ref-getter",
+   cl::desc("Allow transformation using reference getter."),
    cl::cat(Category));
 
 
@@ -98,8 +113,10 @@ int main(int argc, const char** argv) {
       Tool.setDiagnosticConsumer(diagConsumer.get());
 
    EncapsulateDataMemberOptions opts;
-   opts.Names = {Names.begin(), Names.end()};
-   opts.Case  = Case;
+   opts.Names                = {Names.begin(), Names.end()};
+   opts.Case                 = Case;
+   opts.GenerateGetterSetter = !DontGenerateGetterSetter;
+   opts.WithReferenceGetter  = WithReferenceGetter;
 
    TransformContext      ctx;
    EncapsulateDataMember action(&ctx, &opts);
