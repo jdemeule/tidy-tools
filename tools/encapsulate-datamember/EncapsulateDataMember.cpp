@@ -53,17 +53,24 @@ EncapsulateDataMember::EncapsulateDataMember(
    , Options(Options) {}
 
 
+
 void EncapsulateDataMember::registerMatchers(MatchFinder* Finder) {
    for (const auto& Name : Options->Names) {
-      Finder->addMatcher(fieldDecl(hasName(Name)).bind("decl"),
-                         this);  // add getter & setter
+      if (Options->GenerateGetterSetter) {
+         // match symbol declaration to generate getter/setter.
+         Finder->addMatcher(fieldDecl(hasName(Name)).bind("decl"), this);
+      }
 
+      // match terminal LHS usage to call setter.
+      // f.x 42; ==> f.setX(42);
       Finder->addMatcher(
          binaryOperator(hasOperatorName("="),
                         hasLHS(memberExpr(member(hasName(Name))).bind("lhs")))
             .bind("binop"),
-         this);  // f.x = 42; => f.setX(42);
+         this);
 
+      // match unary operation ('--', '++') on symbol.
+      // ++f.x; => f.setX(f.getX() + 1);
       Finder->addMatcher(
          unaryOperator(hasUnaryOperand(memberExpr(member(hasName(Name)),
                                                   hasObjectExpression(
@@ -71,7 +78,14 @@ void EncapsulateDataMember::registerMatchers(MatchFinder* Finder) {
                                           .bind("unary")),
                        anyOf(hasOperatorName("++"), hasOperatorName("--")))
             .bind("unaryop"),
-         this);  // ++f.x; => f.setX(f.getX() + 1);
+         this);
+
+
+      // with contination
+      // hasParent(memberExpr().bind("continuationExpr"))
+      //
+      // take ref of memberExpr
+      // hasParent(unaryOperator(hasOperatorName("&")))
 
       Finder->addMatcher(
          memberExpr(
@@ -97,10 +111,14 @@ void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
       auto type = declaration->getType().getAsString(
          Result.Context->getPrintingPolicy());
 
+      // TODO: add const `type`& in case of setter, if not a primitif type
       std::stringstream fragment;
       fragment << type << " " << name << ";\n"
-               << type << " " << get << "() const { return " << name << "; }\n"
-               << "void " << set << "(" << type << " value) { " << name
+               << type << " " << get << "() const { return " << name << "; }\n";
+      if (Options->WithReferenceGetter) {
+         fragment << type << "& " << get << "() { return " << name << "; }\n";
+      }
+      fragment << "void " << set << "(" << type << " value) { " << name
                << " = value; }\n";
 
       auto Diag =
