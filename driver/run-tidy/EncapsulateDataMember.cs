@@ -16,6 +16,7 @@ namespace RunTidy {
       protected void RunOn(string sourcefile, Options options) {
          var parameters = new List<string> {
             "-names=\"" + Parameters + "\"",
+            "-with-ref-getter",
             "-outputdir=" + options.OutputDir,
             "-p=" + options.WorkingPath,
             sourcefile

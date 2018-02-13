@@ -22,11 +22,12 @@
 // SOFTWARE.
 //
 
-#include "clang/Tooling/CommonOptionsParser.h"
-#include "clang/Tooling/CompilationDatabase.h"
-#include "clang/Tooling/Refactoring.h"
-
 #include "Transform.hpp"
+
+#include "clang/Tooling/CommonOptionsParser.h"
+
+#include <iostream>
+#include <string>
 
 using namespace clang;
 using namespace clang::tooling;

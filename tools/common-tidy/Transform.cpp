@@ -53,6 +53,19 @@ LLVM_INSTANTIATE_REGISTRY(tidy::TransformFactoryRegistry);
 
 namespace tidy {
 
+void TransformContext::push_back(
+   const clang::tooling::Replacement& replacement) {
+#if CLANG_38
+   m_replacements.insert(replacement);
+#else
+   auto error_code = m_replacements.add(replacement);
+   if (error_code) {
+      std::cerr << "Cannot apply " << replacement.toString() << '\n';
+   }
+#endif
+}
+
+
 template <typename It>
 TranslationUnitReplacements BuildTURs(const std::string& mainfilepath,
                                       const std::string& context,

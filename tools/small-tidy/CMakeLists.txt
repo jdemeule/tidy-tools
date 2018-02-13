@@ -1,6 +1,7 @@
 add_tidy_executable(small-tidy
    EarlyReturn.cpp
    InitAtDeclare.cpp
+   ReplaceMemcpy.cpp
    NonAsciiLiteral.cpp
    Sample.cpp
    SmallTidyMain.cpp)
