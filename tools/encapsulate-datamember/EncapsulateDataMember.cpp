@@ -139,7 +139,7 @@ void EncapsulateDataMember::registerMatchers(MatchFinder* Finder) {
       // Other memberExpr matcher without the 3 previous.
       // Split in 2 case, where we need non-const reference access and the rest.
       // f.x => f.getX();
-      if (Options->WithReferenceGetter) {
+      if (Options->WithNonConstGetter) {
          Finder->addMatcher(memberWithReferenceUsage(Name), this);
       }
       else {
@@ -148,7 +148,12 @@ void EncapsulateDataMember::registerMatchers(MatchFinder* Finder) {
    }
 }
 
-
+static StringRef GetSourceText(const Stmt*                     statement,
+                               const MatchFinder::MatchResult& Result) {
+   return clang::Lexer::getSourceText(
+      CharSourceRange::getTokenRange(statement->getSourceRange()),
+      *Result.SourceManager, Result.Context->getLangOpts());
+}
 
 void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
    if (auto declaration = Result.Nodes.getNodeAs<FieldDecl>("decl")) {
@@ -161,13 +166,23 @@ void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
 
       // TODO: add const `type`& in case of setter, if not a primitif type
       std::stringstream fragment;
-      fragment << type << " " << name << ";\n"
-               << type << " " << get << "() const { return " << name << "; }\n";
-      if (Options->WithReferenceGetter) {
+      fragment << type << " " << name << ";\n";
+      if (declaration->getType().getTypePtr()->isFundamentalType()) {
+         fragment << type << " " << get << "() const { return " << name
+                  << "; }\n"
+                  << "void " << set << "(" << type << " value) { " << name
+                  << " = value; }\n";
+      }
+      else {
+         fragment << "const " << type << "& " << get << "() const { return "
+                  << name << "; }\n"
+                  << "void " << set << "(const " << type << "& value) { "
+                  << name << " = value; }\n";
+      }
+      if (Options->WithNonConstGetter) {
          fragment << type << "& " << get << "() { return " << name << "; }\n";
       }
-      fragment << "void " << set << "(" << type << " value) { " << name
-               << " = value; }\n";
+
 
       auto Diag =
          diag(Result, declaration->getLocation(), "Encapsulating foo::x");
@@ -183,12 +198,7 @@ void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
       auto set   = setterName(lhs->getMemberDecl());
 
       std::stringstream fragment;
-      fragment << set << "("
-               << clang::Lexer::getSourceText(
-                     CharSourceRange::getTokenRange(
-                        binop->getRHS()->getSourceRange()),
-                     *Result.SourceManager, Result.Context->getLangOpts())
-                     .str()
+      fragment << set << "(" << GetSourceText(binop->getRHS(), Result).str()
                << ")";
 
       auto Diag = diag(Result, lhs->getExprLoc(), "Encapsulating foo::x");
@@ -203,12 +213,8 @@ void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
       auto get = getterName(unary->getMemberDecl());
       auto set = setterName(unary->getMemberDecl());
 
-      auto varaccess =
-         clang::Lexer::getSourceText(
-            CharSourceRange::getTokenRange(accessExpr->getSourceRange()),
-            *Result.SourceManager, Result.Context->getLangOpts())
-            .str() +
-         (unary->isArrow() ? "->" : ".");
+      auto varaccess = GetSourceText(accessExpr, Result).str() +
+                       (unary->isArrow() ? "->" : ".");
 
       auto unaryop = Result.Nodes.getNodeAs<UnaryOperator>("unaryop");
 
@@ -238,7 +244,7 @@ void EncapsulateDataMember::check(const MatchFinder::MatchResult& Result) {
    }
    if (auto inCall = Result.Nodes.getNodeAs<MemberExpr>("in-call")) {
       auto call = Result.Nodes.getNodeAs<CallExpr>("call");
-      if (!Options->WithReferenceGetter &&
+      if (!Options->WithNonConstGetter &&
           isArgumentCapturedByNonConstReference(call, inCall))
          return;
 

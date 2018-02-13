@@ -70,9 +70,9 @@ static cl::opt<bool> DontGenerateGetterSetter(
    cl::cat(Category));
 
 
-static cl::opt<bool> WithReferenceGetter(
-   "with-ref-getter",
-   cl::desc("Allow transformation using reference getter."),
+static cl::opt<bool> WithNonConstGetter(
+   "with-non-const-getter",
+   cl::desc("Allow transformation using getter returning a reference."),
    cl::cat(Category));
 
 
@@ -116,7 +116,7 @@ int main(int argc, const char** argv) {
    opts.Names                = {Names.begin(), Names.end()};
    opts.Case                 = Case;
    opts.GenerateGetterSetter = !DontGenerateGetterSetter;
-   opts.WithReferenceGetter  = WithReferenceGetter;
+   opts.WithNonConstGetter   = WithNonConstGetter;
 
    TransformContext      ctx;
    EncapsulateDataMember action(&ctx, &opts);

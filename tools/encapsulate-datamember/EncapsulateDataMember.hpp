@@ -40,7 +40,7 @@ struct EncapsulateDataMemberOptions {
    llvm::SmallVector<std::string, 4> Names;
    CaseLevel Case;
    bool      GenerateGetterSetter;
-   bool      WithReferenceGetter;
+   bool      WithNonConstGetter;
 };
 
 class EncapsulateDataMember : public Transform {
